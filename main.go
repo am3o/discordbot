@@ -17,7 +17,6 @@ func main() {
 	token, exists := os.LookupEnv("DISCORD_BOT_TOKEN")
 	if !exists {
 		logger.Fatal("Could not start discord bot without any token")
-		return
 	}
 
 	bot, err := service.New(token, DictonaryPath, logger)

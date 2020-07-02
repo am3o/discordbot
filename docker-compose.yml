@@ -3,3 +3,5 @@ services:
   app:
     build:
       context: .
+    volumes:
+      - "./resouce/dictonary:/usr/local/bin/resources/dictonary.json:ro"
