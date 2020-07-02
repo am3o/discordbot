@@ -2,26 +2,25 @@ package main
 
 import (
 	"context"
-	"os"
+	"flag"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/am3o/discordbot/pkg/service"
-	flag "github.com/spf13/pflag"
 )
 
 func main() {
 	logger := logrus.StandardLogger()
 
 	var DictonaryPath = flag.String("dictionary", "./resources/dictonary.json", "path to the dictionary")
+	var Token = flag.String("token", "", "discord bot token")
 	flag.Parse()
 
-	token, exists := os.LookupEnv("DISCORD_BOT_TOKEN")
-	if !exists {
+	if *Token == "" {
 		logger.Fatal("Could not start discord bot without any token")
 	}
 
-	bot, err := service.New(token, *DictonaryPath, logger)
+	bot, err := service.New(*Token, *DictonaryPath, logger)
 	if err != nil {
 		logger.WithError(err).Error("Could not initialize the bot")
 	}
@@ -31,6 +30,6 @@ func main() {
 		logger.WithError(err).Error("Could not listen any more to the discord session ")
 		return
 	}
-	
+
 	logger.Info("Discord bot is stopped")
 }

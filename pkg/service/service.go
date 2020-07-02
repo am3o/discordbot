@@ -94,7 +94,7 @@ func (service *Service) HandleMessageCreate(s *discord.Session, m *discord.Messa
 func (service *Service) QuoteMessage(message string) (string, error) {
 	for buzzword, values := range service.dictonary {
 		if strings.Contains(message, fmt.Sprintf("!%v", strings.ToLower(buzzword))) {
-			return fmt.Sprintf("> %v \n - %v", values[rand.Int()%len(values)], buzzword), nil
+			return fmt.Sprintf("> %v \n > - %v", values[rand.Int()%len(values)], buzzword), nil
 		}
 	}
 	return "", fmt.Errorf("could not find any qoutes")
