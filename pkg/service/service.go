@@ -76,28 +76,36 @@ func (service *Service) HandleMessageCreate(s *discord.Session, m *discord.Messa
 		service.HelpMessage(s, m)
 	default:
 		if strings.Contains(message, "!") {
-			quote, err := service.QuoteMessage(message)
+			quotes, err := service.QuoteMessage(message)
 			if err != nil {
 				service.logger.WithError(err).Error("Could not find any quote")
 				return
 			}
 
-			if _, err := s.ChannelMessageSend(m.ChannelID, quote); err != nil {
-				service.logger.WithError(err).WithField("channel", m.ChannelID).Error("Could not send message")
-				return
+			for _, quote := range quotes {
+				if _, err := s.ChannelMessageSend(m.ChannelID, quote); err != nil {
+					service.logger.WithError(err).WithField("channel", m.ChannelID).Error("Could not send message")
+					return
+				}
 			}
 		}
 	}
 }
 
 // QuoteMessage returns famous words of some persons out of the dictonary
-func (service *Service) QuoteMessage(message string) (string, error) {
+func (service *Service) QuoteMessage(message string) ([]string, error) {
+	var quotes = make([]string, 0)
 	for buzzword, values := range service.dictonary {
 		if strings.Contains(message, fmt.Sprintf("!%v", strings.ToLower(buzzword))) {
-			return fmt.Sprintf("> %v \n > - %v", values[rand.Int()%len(values)], buzzword), nil
+			quotes = append(quotes, fmt.Sprintf("> %v \n > - %v", values[rand.Int()%len(values)], buzzword))
 		}
 	}
-	return "", fmt.Errorf("could not find any qoutes")
+
+	if len(quotes) == 0 {
+		return nil, fmt.Errorf("could not find any qoutes")
+	}
+
+	return quotes, nil
 }
 
 // HelpMessage returns all commands of the bot
