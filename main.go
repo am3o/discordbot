@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"flag"
+	"os"
 
 	"github.com/sirupsen/logrus"
 
@@ -12,15 +12,17 @@ import (
 func main() {
 	logger := logrus.StandardLogger()
 
-	var DictonaryPath = flag.String("dictionary", "./resources/dictonary.json", "path to the dictionary")
-	var Token = flag.String("token", "", "discord bot token")
-	flag.Parse()
-
-	if *Token == "" {
-		logger.Fatal("Could not start discord bot without any token")
+	dictionary, ok := os.LookupEnv("DICTIONARY")
+	if !ok {
+		logger.Fatal("Resources not found")
 	}
 
-	bot, err := service.New(*Token, *DictonaryPath, logger)
+	token, ok := os.LookupEnv("TOKEN")
+	if !ok {
+		logger.Fatal("Token not found")
+	}
+
+	bot, err := service.New(token, dictionary, logger)
 	if err != nil {
 		logger.WithError(err).Error("Could not initialize the bot")
 	}
