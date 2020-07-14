@@ -8,7 +8,7 @@ clean:
 
 test:
 	@echo ">> Running tests ..."
-	$(TEST_ENV_PRE) $(GO) test -cover  -race  --short $$($(GO) list ./... | grep -v /vendor/ | grep -v /integration | tr "\n" " ") $(TEST_ENV_POST)
+	go test -cover  -race  --short $$($(GO) list ./... | grep -v /vendor/ | grep -v /integration | tr "\n" " ")
 
 vendor:
 	@echo ">> running vendorring ..."
