@@ -1,2 +1,3 @@
 # discordbot
+![Go](https://github.com/Am3o/discordbot/workflows/Go/badge.svg)
 coming soon...
