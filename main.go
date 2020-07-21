@@ -12,13 +12,16 @@ import (
 func main() {
 	logger := logrus.StandardLogger()
 
-	// dictionary, _ := os.LookupEnv("DICTIONARY")
+	dictionary, _ := os.LookupEnv("DICTIONARY")
 	token, ok := os.LookupEnv("DISCORD_TOKEN")
 	if !ok {
 		logger.Fatal("Token not found")
 	}
 
-	bot, err := service.New(token, service.Collector(collector.New()))
+	bot, err := service.New(token,
+		service.Dictonary(dictionary),
+		service.Collector(collector.New()),
+	)
 	if err != nil {
 		logger.WithError(err).Error("Could not initialize the bot")
 	}
