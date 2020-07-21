@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 
+	"github.com/am3o/discordbot/pkg/collector"
 	"github.com/sirupsen/logrus"
 
 	"github.com/am3o/discordbot/pkg/service"
@@ -11,17 +12,13 @@ import (
 func main() {
 	logger := logrus.StandardLogger()
 
-	dictionary, ok := os.LookupEnv("DICTIONARY")
-	if !ok {
-		logger.Fatal("Resources not found")
-	}
-
-	token, ok := os.LookupEnv("TOKEN")
+	// dictionary, _ := os.LookupEnv("DICTIONARY")
+	token, ok := os.LookupEnv("DISCORD_TOKEN")
 	if !ok {
 		logger.Fatal("Token not found")
 	}
 
-	bot, err := service.New(token, service.Dictonary(dictionary))
+	bot, err := service.New(token, service.Collector(collector.New()))
 	if err != nil {
 		logger.WithError(err).Error("Could not initialize the bot")
 	}

@@ -8,19 +8,27 @@ import (
 	"strings"
 
 	discord "github.com/bwmarrin/discordgo"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/square/go-jose.v2/json"
 )
 
 type Dictionary map[string][]string
 
-var DEFAULT_DICTONARY = map[string][]string{"status": {"offline"}}
+var DefaultDictionary = map[string][]string{"foo": {"bar"}}
+
+type BotCollector interface {
+	prometheus.Collector
+	TrackMessage(string, string)
+}
 
 type Service struct {
-	logger    logrus.FieldLogger
-	dictonary Dictionary
-	session   *discord.Session
-	addr      string
+	logger     logrus.FieldLogger
+	collector  BotCollector
+	dictionary Dictionary
+	session    *discord.Session
+	addr       string
 }
 
 type Option func(*Service) error
@@ -36,11 +44,11 @@ func Dictonary(path string) Option {
 	return func(service *Service) error {
 		reader, err := os.Open(path)
 		if err != nil {
-			return fmt.Errorf("could not read the dictonary: %w", err)
+			return fmt.Errorf("could not read the dictionary: %w", err)
 		}
 
-		if err := json.NewDecoder(reader).Decode(&service.dictonary); err != nil {
-			return fmt.Errorf("could not unmarshal the dictonary: %w", err)
+		if err := json.NewDecoder(reader).Decode(&service.dictionary); err != nil {
+			return fmt.Errorf("could not unmarshal the dictionary: %w", err)
 		}
 
 		return nil
@@ -51,6 +59,13 @@ func Address(addr string) Option {
 	return func(service *Service) error {
 		service.addr = addr
 		return nil
+	}
+}
+
+func Collector(collector BotCollector) Option {
+	return func(service *Service) error {
+		service.collector = collector
+		return prometheus.Register(collector)
 	}
 }
 
@@ -66,10 +81,10 @@ func New(token string, options ...Option) (Service, error) {
 	}
 
 	var service = Service{
-		logger:    logrus.StandardLogger(),
-		dictonary: DEFAULT_DICTONARY,
-		session:   session,
-		addr:      ":8080",
+		logger:     logrus.StandardLogger(),
+		dictionary: DefaultDictionary,
+		session:    session,
+		addr:       ":8080",
 	}
 
 	for _, option := range options {
@@ -95,6 +110,8 @@ func (service *Service) Close() {
 
 // HandleMessageCreate is the handler of a discord message event.
 func (service *Service) HandleMessageCreate(s *discord.Session, m *discord.MessageCreate) {
+	defer service.TrackRequest(s, m)
+	
 	message := strings.ToLower(m.Content)
 	switch {
 	case strings.Contains(message, "!help") || strings.Contains(message, "!command"):
@@ -113,10 +130,27 @@ func (service *Service) HandleMessageCreate(s *discord.Session, m *discord.Messa
 	}
 }
 
-// QuoteMessage returns famous words of some persons out of the dictonary
+func (service *Service) TrackRequest(s *discord.Session, m *discord.MessageCreate) {
+	if m.Author.ID == s.State.User.ID {
+		return
+	}
+
+	var channelName = "undefined"
+	defer func() {
+		service.collector.TrackMessage(channelName, m.Author.Username)
+	}()
+
+	channel, err := s.Channel(m.ChannelID)
+	if err != nil {
+		return
+	}
+	channelName = channel.Name
+}
+
+// QuoteMessage returns famous words of some persons out of the dictionary
 func (service *Service) QuoteMessage(message string) ([]string, error) {
 	var quotes = make([]string, 0)
-	for buzzword, values := range service.dictonary {
+	for buzzword, values := range service.dictionary {
 		if strings.Contains(message, fmt.Sprintf("!%v", strings.ToLower(buzzword))) {
 			quotes = append(quotes, fmt.Sprintf("> %v \n > - %v", values[rand.Int()%len(values)], buzzword))
 		}
@@ -135,7 +169,7 @@ func (service *Service) HelpMessage() []string {
 		"The current buzzwords can be used by the bot",
 	}
 
-	for command := range service.dictonary {
+	for command := range service.dictionary {
 		commands = append(commands, command)
 	}
 
@@ -144,20 +178,26 @@ func (service *Service) HelpMessage() []string {
 
 func (service *Service) sendMessages(s *discord.Session, m *discord.MessageCreate, messages ...string) {
 	for _, message := range messages {
-		go func() {
+		go func(content string) {
 			if m.Author.ID == s.State.User.ID {
 				return
 			}
 
-			_, err := s.ChannelMessage(m.ChannelID, message)
+			_, err := s.ChannelMessageSend(m.ChannelID, message)
 			if err != nil {
 				service.logger.WithError(err).Error("Could not send message")
 			}
-		}()
+		}(message)
 	}
 }
 
 // ListenAndServe listen on the tcp connection
 func (s *Service) ListenAndServe() error {
+	http.HandleFunc("/internal/metrics", promhttp.Handler().ServeHTTP)
+	http.HandleFunc("/internal/health", func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+	})
+
+	s.logger.WithField("address", s.addr).Info("Service is still running")
 	return http.ListenAndServe(s.addr, nil)
 }
