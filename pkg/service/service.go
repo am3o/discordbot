@@ -1,14 +1,11 @@
 package service
 
 import (
-	"context"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
+	"net/http"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 
 	discord "github.com/bwmarrin/discordgo"
 	"github.com/sirupsen/logrus"
@@ -17,37 +14,68 @@ import (
 
 type Dictionary map[string][]string
 
+var DEFAULT_DICTONARY = map[string][]string{"status": {"offline"}}
+
 type Service struct {
 	logger    logrus.FieldLogger
 	dictonary Dictionary
 	session   *discord.Session
+	addr      string
+}
+
+type Option func(*Service) error
+
+func Logger(log logrus.FieldLogger) Option {
+	return func(service *Service) error {
+		service.logger = log
+		return nil
+	}
+}
+
+func Dictonary(path string) Option {
+	return func(service *Service) error {
+		reader, err := os.Open(path)
+		if err != nil {
+			return fmt.Errorf("could not read the dictonary: %w", err)
+		}
+
+		if err := json.NewDecoder(reader).Decode(&service.dictonary); err != nil {
+			return fmt.Errorf("could not unmarshal the dictonary: %w", err)
+		}
+
+		return nil
+	}
+}
+
+func Address(addr string) Option {
+	return func(service *Service) error {
+		service.addr = addr
+		return nil
+	}
 }
 
 // New creates a new instance of the service, which creates a new discord session and manage them.
-func New(token string, path string, logger logrus.FieldLogger) (Service, error) {
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return Service{}, fmt.Errorf("could not read the dictonary: %w", err)
-	}
-
-	var dictonary Dictionary
-	if err := json.Unmarshal(data, &dictonary); err != nil {
-		return Service{}, fmt.Errorf("could not unmarshal the dictonary: %w", err)
-	}
-
+func New(token string, options ...Option) (Service, error) {
 	session, err := discord.New(fmt.Sprintf("Bot %s", token))
 	if err != nil {
 		return Service{}, fmt.Errorf("could not create new session: %w", err)
 	}
 
-	var service = Service{
-		logger:    logger,
-		dictonary: dictonary,
-		session:   session,
+	if err := session.Open(); err != nil {
+		return Service{}, fmt.Errorf("could not open the new session: %w", err)
 	}
 
-	if err := service.session.Open(); err != nil {
-		return Service{}, fmt.Errorf("could not open the new session: %w", err)
+	var service = Service{
+		logger:    logrus.StandardLogger(),
+		dictonary: DEFAULT_DICTONARY,
+		session:   session,
+		addr:      ":8080",
+	}
+
+	for _, option := range options {
+		if err := option(&service); err != nil {
+			return Service{}, fmt.Errorf("could noit execute the option: %w", err)
+		}
 	}
 
 	service.session.AddHandler(service.HandleMessageCreate)
@@ -61,19 +89,17 @@ func (service *Service) Close() {
 		service.logger.WithError(err).Error("Could not successfully close the session")
 		return
 	}
+
 	service.logger.Info("session successfully closed")
 }
 
 // HandleMessageCreate is the handler of a discord message event.
 func (service *Service) HandleMessageCreate(s *discord.Session, m *discord.MessageCreate) {
-	if m.Author.ID == s.State.User.ID {
-		return
-	}
-
 	message := strings.ToLower(m.Content)
 	switch {
 	case strings.Contains(message, "!help") || strings.Contains(message, "!command"):
-		service.HelpMessage(s, m)
+		message := service.HelpMessage()
+		service.sendMessages(s, m, message...)
 	default:
 		if strings.Contains(message, "!") {
 			quotes, err := service.QuoteMessage(message)
@@ -82,12 +108,7 @@ func (service *Service) HandleMessageCreate(s *discord.Session, m *discord.Messa
 				return
 			}
 
-			for _, quote := range quotes {
-				if _, err := s.ChannelMessageSend(m.ChannelID, quote); err != nil {
-					service.logger.WithError(err).WithField("channel", m.ChannelID).Error("Could not send message")
-					return
-				}
-			}
+			service.sendMessages(s, m, quotes...)
 		}
 	}
 }
@@ -109,22 +130,34 @@ func (service *Service) QuoteMessage(message string) ([]string, error) {
 }
 
 // HelpMessage returns all commands of the bot
-func (service *Service) HelpMessage(s *discord.Session, m *discord.MessageCreate) {
-	for buzzword := range service.dictonary {
-		if _, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("- %v", buzzword)); err != nil {
-			service.logger.WithError(err).WithField("channel", m.ChannelID).Error("Could not send message")
-		}
+func (service *Service) HelpMessage() []string {
+	var commands = []string{
+		"The current buzzwords can be used by the bot",
+	}
+
+	for command := range service.dictonary {
+		commands = append(commands, command)
+	}
+
+	return commands
+}
+
+func (service *Service) sendMessages(s *discord.Session, m *discord.MessageCreate, messages ...string) {
+	for _, message := range messages {
+		go func() {
+			if m.Author.ID == s.State.User.ID {
+				return
+			}
+
+			_, err := s.ChannelMessage(m.ChannelID, message)
+			if err != nil {
+				service.logger.WithError(err).Error("Could not send message")
+			}
+		}()
 	}
 }
 
-// ListenAndServe
-func (Service) ListenAndServe(ctx context.Context) error {
-	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("context closed")
-	case <-sc:
-		return fmt.Errorf("program interupted and killed")
-	}
+// ListenAndServe listen on the tcp connection
+func (s *Service) ListenAndServe() error {
+	return http.ListenAndServe(s.addr, nil)
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"os"
 
 	"github.com/sirupsen/logrus"
@@ -22,13 +21,13 @@ func main() {
 		logger.Fatal("Token not found")
 	}
 
-	bot, err := service.New(token, dictionary, logger)
+	bot, err := service.New(token, service.Dictonary(dictionary))
 	if err != nil {
 		logger.WithError(err).Error("Could not initialize the bot")
 	}
 	defer bot.Close()
 
-	if err := bot.ListenAndServe(context.Background()); err != nil {
+	if err := bot.ListenAndServe(); err != nil {
 		logger.WithError(err).Error("Could not listen any more to the discord session ")
 		return
 	}
