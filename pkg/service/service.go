@@ -46,6 +46,7 @@ func Dictonary(path string) Option {
 		if err != nil {
 			return fmt.Errorf("could not read the dictionary: %w", err)
 		}
+		defer reader.Close()
 
 		if err := json.NewDecoder(reader).Decode(&service.dictionary); err != nil {
 			return fmt.Errorf("could not unmarshal the dictionary: %w", err)
@@ -111,7 +112,7 @@ func (service *Service) Close() {
 // HandleMessageCreate is the handler of a discord message event.
 func (service *Service) HandleMessageCreate(s *discord.Session, m *discord.MessageCreate) {
 	defer service.TrackRequest(s, m)
-	
+
 	message := strings.ToLower(m.Content)
 	switch {
 	case strings.Contains(message, "!help") || strings.Contains(message, "!command"):
