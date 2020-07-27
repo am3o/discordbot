@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 
 	discord "github.com/bwmarrin/discordgo"
 	"github.com/prometheus/client_golang/prometheus"
@@ -178,18 +179,25 @@ func (service *Service) HelpMessage() []string {
 }
 
 func (service *Service) sendMessages(s *discord.Session, m *discord.MessageCreate, messages ...string) {
+	var wg sync.WaitGroup
+	wg.Add(len(messages))
+	
 	for _, message := range messages {
-		go func(content string) {
+		var content = message
+		go func() {
+			defer wg.Done()
 			if m.Author.ID == s.State.User.ID {
 				return
 			}
 
-			_, err := s.ChannelMessageSend(m.ChannelID, message)
+			_, err := s.ChannelMessageSend(m.ChannelID, content)
 			if err != nil {
 				service.logger.WithError(err).Error("Could not send message")
 			}
-		}(message)
+		}()
 	}
+
+	wg.Wait()
 }
 
 // ListenAndServe listen on the tcp connection
