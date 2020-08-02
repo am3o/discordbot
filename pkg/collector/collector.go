@@ -3,8 +3,8 @@ package collector
 import "github.com/prometheus/client_golang/prometheus"
 
 const (
-	channel    = "channel"
-	userHandle = "userhandel"
+	metricChannel    = "channel"
+	metricUserHandle = "userhandle"
 )
 
 type DiscordCollector struct {
@@ -18,12 +18,12 @@ func New() *DiscordCollector {
 			Namespace: "discord",
 			Name:      "message_total",
 			Help:      "tracks the messages in the channels",
-		}, []string{channel, userHandle}),
+		}, []string{metricChannel, metricUserHandle}),
 		totalBotUsage: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: "discord",
 			Name:      "bot_usage_total",
 			Help:      "tracks the usage of the bot",
-		}, []string{channel, userHandle}),
+		}, []string{metricChannel, metricUserHandle}),
 	}
 }
 
@@ -36,16 +36,16 @@ func (d *DiscordCollector) Collect(ch chan<- prometheus.Metric) {
 	d.totalBotUsage.Collect(ch)
 }
 
-func (d *DiscordCollector) TrackMessage(channel, user string) {
+func (d *DiscordCollector) TrackMessage(channel, userHandle string) {
 	d.totalMessageCounter.With(prometheus.Labels{
-		channel:    channel,
-		userHandle: user,
+		metricChannel:    channel,
+		metricUserHandle: userHandle,
 	}).Inc()
 }
 
 func (d *DiscordCollector) TrackBotUsage(channel, userHandle string) {
 	d.totalBotUsage.With(prometheus.Labels{
-		channel:    channel,
-		userHandle: userHandle,
+		metricChannel:    channel,
+		metricUserHandle: userHandle,
 	}).Inc()
 }
