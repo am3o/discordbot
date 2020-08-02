@@ -1,6 +1,6 @@
-.PHONY: default test vendor
+.PHONY: default test vendor lint fmt build
 
-default: build
+default: clean lint test build
 
 clean:
 	@echo ">> Running cleaning process ..."
@@ -8,7 +8,7 @@ clean:
 
 test:
 	@echo ">> Running tests ..."
-	go test -cover  -race  --short $$($(GO) list ./... | grep -v /vendor/ | grep -v /integration | tr "\n" " ")
+	go test -cover  -race  --short $$(go list ./... | grep -v /vendor/ | grep -v /integration | tr "\n" " ")
 
 vendor:
 	@echo ">> running vendorring ..."
@@ -20,7 +20,7 @@ lint:
 
 fmt:
 	@echo ">> Running code formating ..."
-	go fmt $(go list ./... | grep -v /vendor/)
+	go fmt $$(go list ./... | grep -v /vendor/)
 
 build: clean
 	@echo ">> Running build process ... "

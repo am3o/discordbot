@@ -21,19 +21,27 @@ var DefaultDictionary = map[string][]string{"foo": {"bar"}}
 
 type BotCollector interface {
 	prometheus.Collector
-	TrackMessage(string, string)
+	TrackMessage(channel, userHandle string)
+	TrackBotUsage(channel, userHandle string)
+}
+
+type TextFormatter interface {
+	Format(quote, source string) string
 }
 
 type Service struct {
 	logger     logrus.FieldLogger
 	collector  BotCollector
+	formatter  TextFormatter
 	dictionary Dictionary
 	session    *discord.Session
 	addr       string
 }
 
+// Option is an optional setting for the Service
 type Option func(*Service) error
 
+// Logger option for the service
 func Logger(log logrus.FieldLogger) Option {
 	return func(service *Service) error {
 		service.logger = log
@@ -41,6 +49,7 @@ func Logger(log logrus.FieldLogger) Option {
 	}
 }
 
+// Dictonary option for the service
 func Dictonary(path string) Option {
 	return func(service *Service) error {
 		reader, err := os.Open(path)
@@ -57,6 +66,7 @@ func Dictonary(path string) Option {
 	}
 }
 
+// Address option for the service
 func Address(addr string) Option {
 	return func(service *Service) error {
 		service.addr = addr
@@ -64,10 +74,19 @@ func Address(addr string) Option {
 	}
 }
 
+// Collector option for the service
 func Collector(collector BotCollector) Option {
 	return func(service *Service) error {
 		service.collector = collector
 		return prometheus.Register(collector)
+	}
+}
+
+// MessageFormatter option for the service
+func MessageFormatter(formatter TextFormatter) Option {
+	return func(service *Service) error {
+		service.formatter = formatter
+		return nil
 	}
 }
 
@@ -101,45 +120,46 @@ func New(token string, options ...Option) (Service, error) {
 }
 
 // Close shut down the current discord session
-func (service *Service) Close() {
-	if err := service.session.Close(); err != nil {
-		service.logger.WithError(err).Error("Could not successfully close the session")
+func (srv *Service) Close() {
+	if err := srv.session.Close(); err != nil {
+		srv.logger.WithError(err).Error("Could not successfully close the session")
 		return
 	}
 
-	service.logger.Info("session successfully closed")
+	srv.logger.Info("session successfully closed")
 }
 
 // HandleMessageCreate is the handler of a discord message event.
-func (service *Service) HandleMessageCreate(s *discord.Session, m *discord.MessageCreate) {
-	defer service.TrackRequest(s, m)
+func (srv *Service) HandleMessageCreate(s *discord.Session, m *discord.MessageCreate) {
+	defer srv.TrackRequest(s, m)
 
 	message := strings.ToLower(m.Content)
 	switch {
 	case strings.Contains(message, "!help") || strings.Contains(message, "!command"):
-		message := service.HelpMessage()
-		service.sendMessages(s, m, message...)
+		message := srv.HelpMessage()
+		srv.sendMessages(s, m, message...)
 	default:
 		if strings.Contains(message, "!") {
-			quotes, err := service.QuoteMessage(message)
+			quotes, err := srv.QuoteMessage(message)
 			if err != nil {
-				service.logger.WithError(err).Error("Could not find any quote")
+				srv.logger.WithError(err).Error("Could not find any quote")
 				return
 			}
 
-			service.sendMessages(s, m, quotes...)
+			srv.sendMessages(s, m, quotes...)
 		}
 	}
 }
 
-func (service *Service) TrackRequest(s *discord.Session, m *discord.MessageCreate) {
+func (srv *Service) TrackRequest(s *discord.Session, m *discord.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
 
 	var channelName = "undefined"
 	defer func() {
-		service.collector.TrackMessage(channelName, m.Author.Username)
+		srv.collector.TrackMessage(channelName, m.Author.Username)
+		srv.collector.TrackBotUsage(channelName, m.Author.Username)
 	}()
 
 	channel, err := s.Channel(m.ChannelID)
@@ -150,11 +170,12 @@ func (service *Service) TrackRequest(s *discord.Session, m *discord.MessageCreat
 }
 
 // QuoteMessage returns famous words of some persons out of the dictionary
-func (service *Service) QuoteMessage(message string) ([]string, error) {
+func (srv *Service) QuoteMessage(message string) ([]string, error) {
 	var quotes = make([]string, 0)
-	for buzzword, values := range service.dictionary {
+	for buzzword, values := range srv.dictionary {
 		if strings.Contains(message, fmt.Sprintf("!%v", strings.ToLower(buzzword))) {
-			quotes = append(quotes, fmt.Sprintf("> %v \n > - %v", values[rand.Int()%len(values)], buzzword))
+			quote := values[rand.Int()%len(values)]
+			quotes = append(quotes, srv.formatter.Format(quote, buzzword))
 		}
 	}
 
@@ -166,22 +187,22 @@ func (service *Service) QuoteMessage(message string) ([]string, error) {
 }
 
 // HelpMessage returns all commands of the bot
-func (service *Service) HelpMessage() []string {
+func (srv *Service) HelpMessage() []string {
 	var commands = []string{
 		"The current buzzwords can be used by the bot",
 	}
 
-	for command := range service.dictionary {
+	for command := range srv.dictionary {
 		commands = append(commands, command)
 	}
 
 	return commands
 }
 
-func (service *Service) sendMessages(s *discord.Session, m *discord.MessageCreate, messages ...string) {
+func (srv *Service) sendMessages(s *discord.Session, m *discord.MessageCreate, messages ...string) {
 	var wg sync.WaitGroup
 	wg.Add(len(messages))
-	
+
 	for _, message := range messages {
 		var content = message
 		go func() {
@@ -192,7 +213,7 @@ func (service *Service) sendMessages(s *discord.Session, m *discord.MessageCreat
 
 			_, err := s.ChannelMessageSend(m.ChannelID, content)
 			if err != nil {
-				service.logger.WithError(err).Error("Could not send message")
+				srv.logger.WithError(err).Error("Could not send message")
 			}
 		}()
 	}
@@ -201,12 +222,12 @@ func (service *Service) sendMessages(s *discord.Session, m *discord.MessageCreat
 }
 
 // ListenAndServe listen on the tcp connection
-func (s *Service) ListenAndServe() error {
+func (srv *Service) ListenAndServe() error {
 	http.HandleFunc("/internal/metrics", promhttp.Handler().ServeHTTP)
 	http.HandleFunc("/internal/health", func(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusOK)
 	})
 
-	s.logger.WithField("address", s.addr).Info("Service is still running")
-	return http.ListenAndServe(s.addr, nil)
+	srv.logger.WithField("address", srv.addr).Info("Service is still running")
+	return http.ListenAndServe(srv.addr, nil)
 }

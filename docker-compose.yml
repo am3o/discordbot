@@ -3,5 +3,8 @@ services:
   app:
     build:
       context: .
+    environment:
+      - DICTIONARY=/usr/local/bin/resources/dictonary.json
+      - DISCORD_TOKEN=xxx-xxx-xxx-xxx
     volumes:
       - "./resouce/dictonary:/usr/local/bin/resources/dictonary.json:ro"
