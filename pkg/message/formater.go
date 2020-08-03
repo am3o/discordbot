@@ -9,10 +9,6 @@ const TypeGIF = "gif"
 
 type QuoteFormatter struct{}
 
-func New() QuoteFormatter {
-	return QuoteFormatter{}
-}
-
 func (*QuoteFormatter) Format(quote, source string) (message string) {
 	switch {
 	case quote == "" && source == "":
