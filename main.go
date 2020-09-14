@@ -20,7 +20,7 @@ func main() {
 	}
 
 	bot, err := service.New(token,
-		service.Dictonary(dictionary),
+		service.Dictionary(dictionary),
 		service.Collector(collector.New()),
 		service.MessageFormatter(&message.QuoteFormatter{}),
 	)

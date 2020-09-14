@@ -8,16 +8,13 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/am3o/discordbot/pkg/message"
 	discord "github.com/bwmarrin/discordgo"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/square/go-jose.v2/json"
 )
-
-type Dictionary map[string][]string
-
-var DefaultDictionary = map[string][]string{"foo": {"bar"}}
 
 type BotCollector interface {
 	prometheus.Collector
@@ -29,11 +26,17 @@ type TextFormatter interface {
 	Format(quote, source string) string
 }
 
+type Entry struct {
+	keyword  string
+	detector message.KeywordDetector
+	quotes   []string
+}
+
 type Service struct {
 	logger     logrus.FieldLogger
 	collector  BotCollector
 	formatter  TextFormatter
-	dictionary Dictionary
+	dictionary []Entry
 	session    *discord.Session
 	addr       string
 }
@@ -49,8 +52,8 @@ func Logger(log logrus.FieldLogger) Option {
 	}
 }
 
-// Dictonary option for the service
-func Dictonary(path string) Option {
+// Dictionary option for the service
+func Dictionary(path string) Option {
 	return func(service *Service) error {
 		reader, err := os.Open(path)
 		if err != nil {
@@ -58,10 +61,21 @@ func Dictonary(path string) Option {
 		}
 		defer reader.Close()
 
-		if err := json.NewDecoder(reader).Decode(&service.dictionary); err != nil {
+		var entries map[string][]string
+		if err := json.NewDecoder(reader).Decode(&entries); err != nil {
 			return fmt.Errorf("could not unmarshal the dictionary: %w", err)
 		}
 
+		var dictonary []Entry
+		for key, entry := range entries {
+			dictonary = append(dictonary, Entry{
+				detector: message.NewKeywordDetector(key),
+				keyword:  key,
+				quotes:   entry,
+			})
+		}
+
+		service.dictionary = dictonary
 		return nil
 	}
 }
@@ -102,10 +116,10 @@ func New(token string, options ...Option) (Service, error) {
 	}
 
 	var service = Service{
-		logger:     logrus.StandardLogger(),
-		dictionary: DefaultDictionary,
-		session:    session,
-		addr:       ":8080",
+		logger:    logrus.StandardLogger(),
+		formatter: message.DefaultTextFormatter,
+		session:   session,
+		addr:      ":8080",
 	}
 
 	for _, option := range options {
@@ -136,17 +150,20 @@ func (srv *Service) HandleMessageCreate(s *discord.Session, m *discord.MessageCr
 	message := strings.ToLower(m.Content)
 	switch {
 	case strings.Contains(message, "!help") || strings.Contains(message, "!command"):
-		message := srv.HelpMessage()
-		srv.sendMessages(s, m, message...)
+		srv.sendMessages(s, m, srv.HelpMessage()...)
 	default:
 		if strings.Contains(message, "!") {
-			quotes, err := srv.QuoteMessage(message)
-			if err != nil {
-				srv.logger.WithError(err).Error("Could not find any quote")
-				return
+			var quotes = make([]string, 0)
+			for _, entry := range srv.dictionary {
+				if entry.detector.IsKeywordIncluded(message) {
+					quote := entry.quotes[rand.Int()%len(entry.quotes)]
+					quotes = append(quotes, srv.formatter.Format(quote, entry.keyword))
+				}
 			}
 
-			srv.sendMessages(s, m, quotes...)
+			if len(quotes) > 0 {
+				srv.sendMessages(s, m, quotes...)
+			}
 		}
 	}
 }
@@ -169,36 +186,20 @@ func (srv *Service) TrackRequest(s *discord.Session, m *discord.MessageCreate) {
 	channelName = channel.Name
 }
 
-// QuoteMessage returns famous words of some persons out of the dictionary
-func (srv *Service) QuoteMessage(message string) ([]string, error) {
-	var quotes = make([]string, 0)
-	for buzzword, values := range srv.dictionary {
-		if strings.Contains(message, fmt.Sprintf("!%v", strings.ToLower(buzzword))) {
-			quote := values[rand.Int()%len(values)]
-			quotes = append(quotes, srv.formatter.Format(quote, buzzword))
-		}
-	}
-
-	if len(quotes) == 0 {
-		return nil, fmt.Errorf("could not find any qoutes")
-	}
-
-	return quotes, nil
-}
-
 // HelpMessage returns all commands of the bot
 func (srv *Service) HelpMessage() []string {
-	var commands = []string{
+	var message = []string{
 		"The current buzzwords can be used by the bot",
 	}
 
-	for command := range srv.dictionary {
-		commands = append(commands, command)
+	for _, entry := range srv.dictionary {
+		message = append(message, entry.keyword)
 	}
 
-	return commands
+	return message
 }
 
+// sendMessage sends the message to the discord server with the active session
 func (srv *Service) sendMessages(s *discord.Session, m *discord.MessageCreate, messages ...string) {
 	var wg sync.WaitGroup
 	wg.Add(len(messages))

@@ -7,6 +7,8 @@ import (
 
 const TypeGIF = "gif"
 
+var DefaultTextFormatter = new(QuoteFormatter)
+
 type QuoteFormatter struct{}
 
 func (*QuoteFormatter) Format(quote, source string) (message string) {

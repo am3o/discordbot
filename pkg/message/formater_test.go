@@ -37,6 +37,11 @@ func TestQuoteFormatter_Format(t *testing.T) {
 			source:       "bar",
 			expectedText: "> http://example.com \n > - bar",
 		},
+		{
+			quote:        "https://example.com",
+			source:       "bar",
+			expectedText: "> https://example.com \n > - bar",
+		},
 	}
 
 	t.Parallel()
