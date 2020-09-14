@@ -161,9 +161,14 @@ func (srv *Service) HandleMessageCreate(s *discord.Session, m *discord.MessageCr
 				}
 			}
 
-			if len(quotes) > 0 {
-				srv.sendMessages(s, m, quotes...)
+			if len(quotes) == 0 {
+				srv.logger.WithFields(logrus.Fields{
+					"message": message,
+				}).Error("could not detect some quotes")
+				return
 			}
+
+			srv.sendMessages(s, m, quotes...)
 		}
 	}
 }

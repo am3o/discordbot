@@ -24,24 +24,32 @@ func TestKeywordDetector_Contains(t *testing.T) {
 			includesKeyword: false,
 		},
 		{
-			text:            "Lorem ipsum dolor sit amet, !Foo consetetur sadipscing elitr",
+			text:            "lorem ipsum dolor sit amet, !foo consetetur sadipscing elitr",
 			includesKeyword: true,
 		},
 		{
-			text:            "Lorem ipsum dolor sit amet, consetetur sadipscing elitr !Foo",
+			text:            "lorem ipsum dolor sit amet, consetetur sadipscing elitr !foo",
 			includesKeyword: true,
 		},
 		{
-			text:            "!Foo Lorem ipsum dolor sit amet, consetetur sadipscing elitr",
+			text:            "!foo lorem ipsum dolor sit amet, consetetur sadipscing elitr",
 			includesKeyword: true,
 		},
 	}
 
 	t.Parallel()
-	var detector = NewKeywordDetector("Foo")
-	for _, tc := range tt {
-		t.Run(tc.text, func(t *testing.T) {
-			assert.Equal(t, tc.includesKeyword,detector.IsKeywordIncluded(tc.text))
-		})
+
+	for _, keyword := range []string{
+		"Foo",
+		"foo",
+		"fOo",
+		"FOO",
+	} {
+		var detector = NewKeywordDetector(keyword)
+		for _, tc := range tt {
+			t.Run(tc.text, func(t *testing.T) {
+				assert.Equal(t, tc.includesKeyword, detector.IsKeywordIncluded(tc.text))
+			})
+		}
 	}
 }
