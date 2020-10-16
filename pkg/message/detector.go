@@ -7,18 +7,18 @@ import (
 )
 
 type KeywordDetector struct {
-	Key string
 	exp *regexp.Regexp
 }
 
 func NewKeywordDetector(keyword string) KeywordDetector {
+	const REGEX = "\\b%v\\b"
+
 	key := strings.ToLower(keyword)
 	return KeywordDetector{
-		Key: keyword,
-		exp: regexp.MustCompile(fmt.Sprintf("!%s$|!%s\\s", key, key)),
+		exp: regexp.MustCompile(fmt.Sprintf(REGEX, key)),
 	}
 }
 
 func (q *KeywordDetector) IsKeywordIncluded(message string) bool {
-	return q.exp.MatchString(message)
+	return q.exp.MatchString(strings.ToLower(message))
 }

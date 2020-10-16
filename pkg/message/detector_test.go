@@ -7,38 +7,65 @@ import (
 )
 
 func TestKeywordDetector_Contains(t *testing.T) {
-	tt := []struct{
-		text string
-		includesKeyword bool
+	tt := []struct {
+		text          string
+		expectKeyword bool
 	}{
 		{
-			text:            "",
-			includesKeyword: false,
+			text:          "",
+			expectKeyword: false,
 		},
 		{
-			text:            "!Foo",
-			includesKeyword: true,
+			text:          "!Foo",
+			expectKeyword: true,
 		},
 		{
-			text:            "!Foobar",
-			includesKeyword: false,
+			text:          "!Foobar",
+			expectKeyword: false,
 		},
 		{
-			text:            "lorem ipsum dolor sit amet, !foo consetetur sadipscing elitr",
-			includesKeyword: true,
+			text:          "!Fooo",
+			expectKeyword: false,
 		},
 		{
-			text:            "lorem ipsum dolor sit amet, consetetur sadipscing elitr !foo",
-			includesKeyword: true,
+			text:          "!oFooo",
+			expectKeyword: false,
 		},
 		{
-			text:            "!foo lorem ipsum dolor sit amet, consetetur sadipscing elitr",
-			includesKeyword: true,
+			text:          "lorem ipsum dolor sit amet, !foo consetetur sadipscing elitr",
+			expectKeyword: true,
+		},
+		{
+			text:          "lorem ipsum dolor sit amet, consetetur sadipscing elitr !foo",
+			expectKeyword: true,
+		},
+		{
+			text:          "!foo lorem ipsum dolor sit amet, consetetur sadipscing elitr",
+			expectKeyword: true,
+		},
+		{
+			text:          "!foo! lorem ipsum dolor sit amet, consetetur sadipscing elitr",
+			expectKeyword: true,
+		},
+		{
+			text:          "lorem ipsum dolor sit!foo! amet, consetetur sadipscing elitr",
+			expectKeyword: true,
+		},
+		{
+			text:          "!foo-",
+			expectKeyword: true,
+		},
+		{
+			text:          "!foo\t",
+			expectKeyword: true,
+		},
+		{
+			text:          "!foo\n",
+			expectKeyword: true,
 		},
 	}
 
 	t.Parallel()
-
 	for _, keyword := range []string{
 		"Foo",
 		"foo",
@@ -48,7 +75,7 @@ func TestKeywordDetector_Contains(t *testing.T) {
 		var detector = NewKeywordDetector(keyword)
 		for _, tc := range tt {
 			t.Run(tc.text, func(t *testing.T) {
-				assert.Equal(t, tc.includesKeyword, detector.IsKeywordIncluded(tc.text))
+				assert.Equal(t, tc.expectKeyword, detector.IsKeywordIncluded(tc.text))
 			})
 		}
 	}
