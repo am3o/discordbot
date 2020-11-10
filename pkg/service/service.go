@@ -2,14 +2,12 @@ package service
 
 import (
 	"fmt"
-	"math/rand"
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 
-	"github.com/am3o/discordbot/pkg/message"
-	discord "github.com/bwmarrin/discordgo"
+	"github.com/am3o/discordbot/pkg/client"
+	"github.com/am3o/discordbot/pkg/operations"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -22,22 +20,11 @@ type BotCollector interface {
 	TrackBotUsage(channel, userHandle string)
 }
 
-type TextFormatter interface {
-	Format(quote, source string) string
-}
-
-type Entry struct {
-	keyword  string
-	detector message.KeywordDetector
-	quotes   []string
-}
-
 type Service struct {
 	logger     logrus.FieldLogger
 	collector  BotCollector
-	formatter  TextFormatter
-	dictionary []Entry
-	session    *discord.Session
+	dictionary operations.QuotesOperator
+	discord    *client.Discord
 	addr       string
 }
 
@@ -66,16 +53,7 @@ func Dictionary(path string) Option {
 			return fmt.Errorf("could not unmarshal the dictionary: %w", err)
 		}
 
-		var dictonary []Entry
-		for key, entry := range entries {
-			dictonary = append(dictonary, Entry{
-				detector: message.NewKeywordDetector(key),
-				keyword:  key,
-				quotes:   entry,
-			})
-		}
-
-		service.dictionary = dictonary
+		service.dictionary = operations.NewQuotesOperator(entries)
 		return nil
 	}
 }
@@ -96,30 +74,17 @@ func Collector(collector BotCollector) Option {
 	}
 }
 
-// MessageFormatter option for the service
-func MessageFormatter(formatter TextFormatter) Option {
-	return func(service *Service) error {
-		service.formatter = formatter
-		return nil
-	}
-}
-
 // New creates a new instance of the service, which creates a new discord session and manage them.
 func New(token string, options ...Option) (Service, error) {
-	session, err := discord.New(fmt.Sprintf("Bot %s", token))
+	discord, err := client.NewDiscord(fmt.Sprintf("Bot %s", token))
 	if err != nil {
 		return Service{}, fmt.Errorf("could not create new session: %w", err)
 	}
 
-	if err := session.Open(); err != nil {
-		return Service{}, fmt.Errorf("could not open the new session: %w", err)
-	}
-
-	var service = Service{
-		logger:    logrus.StandardLogger(),
-		formatter: message.DefaultTextFormatter,
-		session:   session,
-		addr:      ":8080",
+	service := Service{
+		logger:  logrus.StandardLogger(),
+		discord: discord,
+		addr:    ":8080",
 	}
 
 	for _, option := range options {
@@ -128,103 +93,51 @@ func New(token string, options ...Option) (Service, error) {
 		}
 	}
 
-	service.session.AddHandler(service.HandleMessageCreate)
+	discord.SubscribeMessageEvents(&service)
 
 	return service, nil
 }
 
 // Close shut down the current discord session
 func (srv *Service) Close() {
-	if err := srv.session.Close(); err != nil {
-		srv.logger.WithError(err).Error("Could not successfully close the session")
-		return
-	}
-
-	srv.logger.Info("session successfully closed")
-}
-
-// HandleMessageCreate is the handler of a discord message event.
-func (srv *Service) HandleMessageCreate(s *discord.Session, m *discord.MessageCreate) {
-	defer srv.TrackRequest(s, m)
-
-	message := strings.ToLower(m.Content)
-	switch {
-	case strings.Contains(message, "!help") || strings.Contains(message, "!command"):
-		srv.sendMessages(s, m, srv.HelpMessage()...)
-	default:
-		if strings.Contains(message, "!") {
-			var quotes = make([]string, 0)
-			for _, entry := range srv.dictionary {
-				if entry.detector.IsKeywordIncluded(message) {
-					quote := entry.quotes[rand.Int()%len(entry.quotes)]
-					quotes = append(quotes, srv.formatter.Format(quote, entry.keyword))
-				}
-			}
-
-			if len(quotes) == 0 {
-				srv.logger.WithFields(logrus.Fields{
-					"message": message,
-				}).Error("could not detect some quotes")
-				return
-			}
-
-			srv.sendMessages(s, m, quotes...)
-		}
+	if err := srv.discord.Close(); err != nil {
+		srv.logger.WithError(err).Error("Cloud not shut down the discord session")
 	}
 }
 
-func (srv *Service) TrackRequest(s *discord.Session, m *discord.MessageCreate) {
-	if m.Author.ID == s.State.User.ID {
-		return
-	}
+func (srv *Service) TrackRequest(channel, authorID string) {
+	author, _ := srv.discord.Author(authorID)
 
-	var channelName = "undefined"
-	defer func() {
-		srv.collector.TrackMessage(channelName, m.Author.Username)
-		srv.collector.TrackBotUsage(channelName, m.Author.Username)
-	}()
-
-	channel, err := s.Channel(m.ChannelID)
-	if err != nil {
-		return
-	}
-	channelName = channel.Name
+	srv.collector.TrackMessage(channel, author)
+	srv.collector.TrackBotUsage(channel, author)
 }
 
 // HelpMessage returns all commands of the bot
 func (srv *Service) HelpMessage() []string {
-	var message = []string{
+	return []string{
 		"The current buzzwords can be used by the bot",
+		srv.dictionary.String(),
 	}
-
-	for _, entry := range srv.dictionary {
-		message = append(message, entry.keyword)
-	}
-
-	return message
 }
 
-// sendMessage sends the message to the discord server with the active session
-func (srv *Service) sendMessages(s *discord.Session, m *discord.MessageCreate, messages ...string) {
-	var wg sync.WaitGroup
-	wg.Add(len(messages))
+func (srv *Service) Publish(channel, author string, message string) {
+	defer srv.TrackRequest(channel, author)
 
-	for _, message := range messages {
-		var content = message
-		go func() {
-			defer wg.Done()
-			if m.Author.ID == s.State.User.ID {
-				return
-			}
+	switch {
+	case strings.Contains(message, "!help") || strings.Contains(message, "!command"):
+		srv.discord.SendMessages(channel, author, srv.HelpMessage()...)
+	default:
+		quotes := srv.dictionary.Exec(message)
 
-			_, err := s.ChannelMessageSend(m.ChannelID, content)
-			if err != nil {
-				srv.logger.WithError(err).Error("Could not send message")
-			}
-		}()
+		if len(quotes) == 0 {
+			srv.logger.WithFields(logrus.Fields{
+				"message": message,
+			}).Error("could not detect some quotes")
+			return
+		}
+
+		srv.discord.SendMessages(channel, author, quotes...)
 	}
-
-	wg.Wait()
 }
 
 // ListenAndServe listen on the tcp connection

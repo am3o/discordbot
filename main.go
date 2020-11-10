@@ -4,7 +4,6 @@ import (
 	"os"
 
 	"github.com/am3o/discordbot/pkg/collector"
-	"github.com/am3o/discordbot/pkg/message"
 	"github.com/sirupsen/logrus"
 
 	"github.com/am3o/discordbot/pkg/service"
@@ -22,7 +21,6 @@ func main() {
 	bot, err := service.New(token,
 		service.Dictionary(dictionary),
 		service.Collector(collector.New()),
-		service.MessageFormatter(&message.QuoteFormatter{}),
 	)
 	if err != nil {
 		logger.WithError(err).Error("Could not initialize the bot")
