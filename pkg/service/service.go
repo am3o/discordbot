@@ -76,7 +76,7 @@ func Collector(collector BotCollector) Option {
 
 // New creates a new instance of the service, which creates a new discord session and manage them.
 func New(token string, options ...Option) (Service, error) {
-	discord, err := client.NewDiscord(fmt.Sprintf("Bot %s", token))
+	discord, err := client.NewDiscord(token)
 	if err != nil {
 		return Service{}, fmt.Errorf("could not create new session: %w", err)
 	}
@@ -100,8 +100,10 @@ func New(token string, options ...Option) (Service, error) {
 
 // Close shut down the current discord session
 func (srv *Service) Close() {
-	if err := srv.discord.Close(); err != nil {
-		srv.logger.WithError(err).Error("Cloud not shut down the discord session")
+	if srv.discord != nil {
+		if err := srv.discord.Close(); err != nil {
+			srv.logger.WithError(err).Error("Cloud not shut down the discord session")
+		}
 	}
 }
 
@@ -147,6 +149,5 @@ func (srv *Service) ListenAndServe() error {
 		writer.WriteHeader(http.StatusOK)
 	})
 
-	srv.logger.WithField("address", srv.addr).Info("Service is still running")
 	return http.ListenAndServe(srv.addr, nil)
 }

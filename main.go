@@ -21,6 +21,7 @@ func main() {
 	bot, err := service.New(token,
 		service.Dictionary(dictionary),
 		service.Collector(collector.New()),
+		service.Logger(logger),
 	)
 	if err != nil {
 		logger.WithError(err).Error("Could not initialize the bot")

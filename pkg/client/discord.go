@@ -15,7 +15,7 @@ type Discord struct {
 func NewDiscord(token string) (*Discord, error) {
 	session, err := discord.New(fmt.Sprintf("Bot %s", token))
 	if err != nil {
-		return nil, fmt.Errorf("could not create new session: %w", err)
+		return nil, fmt.Errorf("could not create new discord session: %w", err)
 	}
 
 	if err := session.Open(); err != nil {
@@ -32,8 +32,12 @@ func NewDiscord(token string) (*Discord, error) {
 	return &client, nil
 }
 
-func (client *Discord) Close() error {
-	return client.session.Close()
+func (client Discord) Close() error {
+	if client.session != nil {
+		return client.session.Close()
+	}
+
+	return nil
 }
 
 func (client *Discord) SendMessages(channelID, authorID string, messages ...string) {
