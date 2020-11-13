@@ -26,6 +26,7 @@ func (operator QuotesOperator) String() (result string) {
 }
 
 func (operator QuotesOperator) Exec(message string) (quotes []string) {
+	message = strings.ToLower(message)
 	if !strings.Contains(message, "!") {
 		return
 	}
