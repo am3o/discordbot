@@ -68,5 +68,19 @@ func (q *Quote) Exec(message string) (string, error) {
 		return "", fmt.Errorf("could not find any keyword: %v", q.keyword)
 	}
 
-	return q.quotes[rand.Int()%len(q.quotes)], nil
+	return q.String(rand.Int() % len(q.quotes)), nil
+}
+
+const TypeGIF = "gif"
+
+func (q *Quote) String(id int) string {
+	quote, source := q.quotes[id], q.keyword
+	switch {
+	case quote == "" && source == "":
+		return ""
+	case strings.HasPrefix(quote, "http") && strings.Contains(strings.ToLower(source), TypeGIF):
+		return quote
+	default:
+		return fmt.Sprintf("> %v \n > - %v", quote, source)
+	}
 }
