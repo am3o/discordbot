@@ -20,6 +20,7 @@ func main() {
 
 	bot, err := service.New(token,
 		service.Dictionary(dictionary),
+		service.Jokes(),
 		service.Collector(collector.New()),
 		service.Logger(logger),
 	)

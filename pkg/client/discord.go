@@ -64,8 +64,13 @@ func (client *Discord) SendMessage(channelID, authorID, content string) error {
 }
 
 func (client *Discord) HandleMessageCreate(_ *discord.Session, m *discord.MessageCreate) {
+	if m.Author.ID == client.session.State.User.ID {
+		return
+	}
+
 	for _, subscriber := range client.subscribers {
-		subscriber.Publish(m.ChannelID, m.Author.ID, m.Content)
+		subscriber.
+			Publish(m.ChannelID, m.Author.ID, m.Content)
 	}
 }
 

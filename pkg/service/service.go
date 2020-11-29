@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -24,6 +25,7 @@ type Service struct {
 	logger     logrus.FieldLogger
 	collector  BotCollector
 	dictionary operations.QuotesOperator
+	jokes      operations.JokesOperator
 	discord    *client.Discord
 	addr       string
 }
@@ -71,6 +73,15 @@ func Collector(collector BotCollector) Option {
 	return func(service *Service) error {
 		service.collector = collector
 		return prometheus.Register(collector)
+	}
+}
+
+// Jokes option for the service
+func Jokes() Option {
+	return func(service *Service) error {
+		joker := client.NewJoker()
+		service.jokes = operations.NewJokeOperator(joker)
+		return nil
 	}
 }
 
@@ -125,9 +136,21 @@ func (srv *Service) HelpMessage() []string {
 func (srv *Service) Publish(channel, author string, message string) {
 	defer srv.TrackRequest(channel, author)
 
+	var response []string
 	switch {
 	case strings.Contains(message, "!help") || strings.Contains(message, "!command"):
-		srv.discord.SendMessages(channel, author, srv.HelpMessage()...)
+		response = append(response, srv.HelpMessage()...)
+	case strings.Contains(message, "!joke"):
+		joke, err := srv.jokes.Exec(context.Background())
+		if err != nil {
+			srv.logger.WithFields(logrus.Fields{
+				"message": message,
+				"author":  author,
+				"channel": channel,
+			}).WithError(err).Error("could not create joke")
+			return
+		}
+		response = append(response, joke)
 	default:
 		quotes := srv.dictionary.Exec(message)
 
@@ -139,9 +162,10 @@ func (srv *Service) Publish(channel, author string, message string) {
 			}).Error("could not detect some quotes")
 			return
 		}
-
-		srv.discord.SendMessages(channel, author, quotes...)
+		response = append(response, quotes...)
 	}
+
+	srv.discord.SendMessages(channel, author, response...)
 }
 
 // ListenAndServe listen on the tcp connection
