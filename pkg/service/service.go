@@ -134,6 +134,8 @@ func (srv *Service) Publish(channel, author string, message string) {
 		if len(quotes) == 0 {
 			srv.logger.WithFields(logrus.Fields{
 				"message": message,
+				"author":  author,
+				"channel": channel,
 			}).Error("could not detect some quotes")
 			return
 		}
