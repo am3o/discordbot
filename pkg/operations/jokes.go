@@ -18,10 +18,10 @@ func NewJokeOperator(client client.Joker) JokesOperator {
 }
 
 func (operator *JokesOperator) Exec(ctx context.Context) (string, error) {
-	resp, err := operator.client.GetRandomJoke(ctx)
+	joke, err := operator.client.GetRandomJoke(ctx)
 	if err != nil {
 		return "", fmt.Errorf("could not create new joke: %w", err)
 	}
 
-	return fmt.Sprintf("> %v \n || %v ||", resp.Setup, resp.Punchline), nil
+	return fmt.Sprintf("> %v\n", joke.Content), nil
 }

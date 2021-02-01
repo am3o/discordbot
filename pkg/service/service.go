@@ -129,6 +129,7 @@ func (srv *Service) TrackRequest(channel, authorID string) {
 func (srv *Service) HelpMessage() []string {
 	return []string{
 		"The current buzzwords can be used by the bot",
+		"joke",
 		srv.dictionary.String(),
 	}
 }
