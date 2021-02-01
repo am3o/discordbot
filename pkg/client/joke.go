@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"path"
 )
 
 type Joke struct {
@@ -19,7 +18,7 @@ type Joker struct {
 
 func NewJoker() Joker {
 	return Joker{
-		url: "https://official-joke-api.appspot.com/jokes",
+		url: "https://icanhazdadjoke.com/",
 	}
 }
 
@@ -28,14 +27,13 @@ func (client Joker) GetRandomJoke(ctx context.Context) (Joke, error) {
 	if err != nil {
 		return Joke{}, fmt.Errorf("could not parse joke api URL: %w", err)
 	}
-	URL.Path = path.Join(URL.Path, "random")
 
 	req, err := http.NewRequest(http.MethodGet, URL.String(), nil)
 	if err != nil {
 		return Joke{}, fmt.Errorf("could not create joke api request: %w", err)
 	}
 	req.WithContext(ctx)
-	req.Header.Set("Accept", "application/json")
+	req.Header.Add("Accept", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
