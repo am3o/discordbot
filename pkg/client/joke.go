@@ -32,7 +32,7 @@ func (client Joker) GetRandomJoke(ctx context.Context) (Joke, error) {
 	if err != nil {
 		return Joke{}, fmt.Errorf("could not create joke api request: %w", err)
 	}
-	req.WithContext(ctx)
+	req = req.WithContext(ctx)
 	req.Header.Add("Accept", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)

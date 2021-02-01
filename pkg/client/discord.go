@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	discord "github.com/bwmarrin/discordgo"
@@ -70,7 +71,7 @@ func (client *Discord) HandleMessageCreate(_ *discord.Session, m *discord.Messag
 
 	for _, subscriber := range client.subscribers {
 		subscriber.
-			Publish(m.ChannelID, m.Author.Username, m.Content)
+			Publish(m.ChannelID, m.Author.Username, strings.ToLower(m.Content))
 	}
 }
 
