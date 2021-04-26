@@ -173,6 +173,10 @@ func (srv *Service) Publish(channel, author string, message string) {
 func (srv *Service) ListenAndServe() error {
 	http.HandleFunc("/internal/metrics", promhttp.Handler().ServeHTTP)
 	http.HandleFunc("/internal/health", func(writer http.ResponseWriter, request *http.Request) {
+		if srv.discord.Ping() {
+			writer.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		writer.WriteHeader(http.StatusOK)
 	})
 

@@ -33,12 +33,17 @@ func NewDiscord(token string) (*Discord, error) {
 	return &client, nil
 }
 
-func (client Discord) Close() error {
+func (client *Discord) Close() error {
 	if client.session != nil {
 		return client.session.Close()
 	}
 
 	return nil
+}
+
+func (client *Discord) Ping() bool {
+	_, err := client.session.Gateway()
+	return err != nil
 }
 
 func (client *Discord) SendMessages(channelID, authorID string, messages ...string) {
@@ -49,9 +54,9 @@ func (client *Discord) SendMessages(channelID, authorID string, messages ...stri
 		go func(content string) error {
 			defer wg.Done()
 			return client.SendMessage(channelID, authorID, content)
-		}(message)
+		}(message) //nolint:errcheck
 	}
-
+	
 	wg.Wait()
 }
 

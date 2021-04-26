@@ -16,6 +16,7 @@ func main() {
 	token, ok := os.LookupEnv("DISCORD_TOKEN")
 	if !ok {
 		logger.Fatal("Token not found")
+		panic("The token is required for the service")
 	}
 
 	bot, err := service.New(token,
