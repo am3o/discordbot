@@ -43,7 +43,7 @@ func (client *Discord) Close() error {
 
 func (client *Discord) Ping() bool {
 	_, err := client.session.Gateway()
-	return err != nil
+	return err == nil
 }
 
 func (client *Discord) SendMessages(channelID, authorID string, messages ...string) {
@@ -56,7 +56,7 @@ func (client *Discord) SendMessages(channelID, authorID string, messages ...stri
 			return client.SendMessage(channelID, authorID, content)
 		}(message) //nolint:errcheck
 	}
-	
+
 	wg.Wait()
 }
 

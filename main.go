@@ -30,6 +30,7 @@ func main() {
 	}
 	defer bot.Close()
 
+	logrus.Info("Start the bot")
 	if err := bot.ListenAndServe(); err != nil {
 		logger.WithError(err).Error("Could not listen any more to the discord session ")
 		return
