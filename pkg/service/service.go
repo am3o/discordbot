@@ -22,12 +22,13 @@ type BotCollector interface {
 }
 
 type Service struct {
-	logger     logrus.FieldLogger
-	collector  BotCollector
-	dictionary operations.QuotesOperator
-	jokes      operations.JokesOperator
-	discord    *client.Discord
-	addr       string
+	logger         logrus.FieldLogger
+	collector      BotCollector
+	dictionary     operations.QuotesOperator
+	jokes          operations.JokesOperator
+	pinnedMessages operations.PinnedMessagesOperator
+	discord        *client.Discord
+	addr           string
 }
 
 // Option is an optional setting for the Service
@@ -56,6 +57,18 @@ func Dictionary(path string) Option {
 		}
 
 		service.dictionary = operations.NewQuotesOperator(entries)
+		return nil
+	}
+}
+
+func PinnedMessages(token string) Option {
+	return func(service *Service) error {
+		client, err := client.NewDiscord(token)
+		if err != nil {
+			return fmt.Errorf("could not initialize discord client for pinned messages: %w", err)
+		}
+
+		service.pinnedMessages = operations.NewPinnedMessagesOperator(client)
 		return nil
 	}
 }
@@ -152,6 +165,17 @@ func (srv *Service) Publish(channel, author string, message string) {
 			return
 		}
 		response = append(response, joke)
+	case strings.Contains(message, "!pin"):
+		pinnedMessage, err := srv.pinnedMessages.Exec(channel)
+		if err != nil {
+			srv.logger.WithFields(logrus.Fields{
+				"message": message,
+				"author":  author,
+				"channel": channel,
+			}).WithError(err).Error("could not create joke")
+			return
+		}
+		response = append(response, pinnedMessage)
 	default:
 		quotes := srv.dictionary.Exec(message)
 

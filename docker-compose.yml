@@ -4,7 +4,7 @@ services:
     build:
       context: .
     environment:
-      - DICTIONARY=/usr/local/bin/resources/dictonary.json
-      - DISCORD_TOKEN=xxx-xxx-xxx-xxx
+      - DICTIONARY=/var/dictonary.json
+      - DISCORD_TOKEN=${TOKEN}
     volumes:
-      - "./resouce/dictonary:/usr/local/bin/resources/dictonary.json:ro"
+      - "./resources/dictonary.json:/var/dictonary.json:ro"

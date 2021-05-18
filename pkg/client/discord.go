@@ -42,8 +42,8 @@ func (client *Discord) Close() error {
 }
 
 func (client *Discord) Ping() bool {
-	_, err := client.session.Gateway()
-	return err == nil
+	// todo: check the state of the discord session
+	return true
 }
 
 func (client *Discord) SendMessages(channelID, authorID string, messages ...string) {
@@ -86,6 +86,20 @@ func (client *Discord) Author(id string) (string, error) {
 		return "", err
 	}
 	return user.Username, nil
+}
+
+func (client *Discord) GetPinned(channelID string) ([]string, error) {
+	channelMessagesPinned, err := client.session.ChannelMessagesPinned(channelID)
+	if err != nil {
+		return nil, fmt.Errorf("no pinned messages: %w", err)
+	}
+
+	var pinnedMessages []string
+	for _, channelMessagePinned := range channelMessagesPinned {
+		pinnedMessages = append(pinnedMessages, channelMessagePinned.Content)
+	}
+
+	return pinnedMessages, nil
 }
 
 type Publisher interface {

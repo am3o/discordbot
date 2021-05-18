@@ -22,6 +22,7 @@ func main() {
 	bot, err := service.New(token,
 		service.Dictionary(dictionary),
 		service.Jokes(),
+		service.PinnedMessages(token),
 		service.Collector(collector.New()),
 		service.Logger(logger),
 	)
