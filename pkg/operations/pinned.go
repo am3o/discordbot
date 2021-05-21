@@ -3,29 +3,63 @@ package operations
 import (
 	"fmt"
 	"math/rand"
+	"sync"
+	"time"
 
 	"github.com/am3o/discordbot/pkg/client"
 )
 
 type PinnedMessagesOperator struct {
+	m      sync.Mutex
 	client *client.Discord
+	cached map[string][]string
 }
 
 func NewPinnedMessagesOperator(client *client.Discord) PinnedMessagesOperator {
 	return PinnedMessagesOperator{
 		client: client,
+		cached: make(map[string][]string),
+	}
+}
+
+func (operator *PinnedMessagesOperator) Run(duration time.Duration) {
+	ticker := time.NewTicker(duration)
+	for ; ; <-ticker.C {
+		for channelID := range operator.cached {
+			pinnedMessages, err := operator.client.GetPinned(channelID)
+			if err != nil {
+				break
+			}
+
+			operator.m.Lock()
+			operator.cached[channelID] = pinnedMessages
+			operator.m.Unlock()
+		}
 	}
 }
 
 func (operator *PinnedMessagesOperator) Exec(channelID string) (string, error) {
-	pinnedMessages, err := operator.client.GetPinned(channelID)
-	if err != nil {
-		return "", err
+	operator.m.Lock()
+	defer operator.m.Unlock()
+
+	_, exists := operator.cached[channelID]
+	if !exists {
+		pinnedMessages, err := operator.client.GetPinned(channelID)
+		if err != nil {
+			return "", err
+		}
+
+		if len(pinnedMessages) == 0 {
+			return "", fmt.Errorf("no pinned messages detected")
+		}
+
+		operator.cached[channelID] = pinnedMessages
 	}
 
-	if len(pinnedMessages) == 0 {
-		return "", fmt.Errorf("no pinned messages detected")
+	pinnedMessage := operator.cached[channelID][rand.Int()%len(operator.cached[channelID])]
+	if pinnedMessage == "" {
+		pinnedMessage = "undefined"
 	}
 
-	return pinnedMessages[rand.Int()%len(pinnedMessages)], nil
+	return pinnedMessage, nil
 }

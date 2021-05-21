@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"time"
 
 	"github.com/am3o/discordbot/pkg/collector"
 	"github.com/sirupsen/logrus"
@@ -22,7 +23,7 @@ func main() {
 	bot, err := service.New(token,
 		service.Dictionary(dictionary),
 		service.Jokes(),
-		service.PinnedMessages(token),
+		service.PinnedMessages(token, time.Second*30),
 		service.Collector(collector.New()),
 		service.Logger(logger),
 	)

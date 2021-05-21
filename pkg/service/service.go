@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/am3o/discordbot/pkg/client"
 	"github.com/am3o/discordbot/pkg/operations"
@@ -61,7 +62,7 @@ func Dictionary(path string) Option {
 	}
 }
 
-func PinnedMessages(token string) Option {
+func PinnedMessages(token string, update time.Duration) Option {
 	return func(service *Service) error {
 		client, err := client.NewDiscord(token)
 		if err != nil {
@@ -69,6 +70,7 @@ func PinnedMessages(token string) Option {
 		}
 
 		service.pinnedMessages = operations.NewPinnedMessagesOperator(client)
+		go service.pinnedMessages.Run(update)
 		return nil
 	}
 }

@@ -96,7 +96,14 @@ func (client *Discord) GetPinned(channelID string) ([]string, error) {
 
 	var pinnedMessages []string
 	for _, channelMessagePinned := range channelMessagesPinned {
-		pinnedMessages = append(pinnedMessages, channelMessagePinned.Content)
+		if channelMessagePinned.Content != "" {
+			pinnedMessage := fmt.Sprintf("> %v \n > - %v \n", channelMessagePinned.Content, channelMessagePinned.Author.Username)
+			if strings.Contains(channelMessagePinned.Content, "http") {
+				pinnedMessage = channelMessagePinned.Content
+			}
+
+			pinnedMessages = append(pinnedMessages, pinnedMessage)
+		}
 	}
 
 	return pinnedMessages, nil
