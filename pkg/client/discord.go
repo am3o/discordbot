@@ -75,8 +75,7 @@ func (client *Discord) HandleMessageCreate(_ *discord.Session, m *discord.Messag
 	}
 
 	for _, subscriber := range client.subscribers {
-		subscriber.
-			Publish(m.ChannelID, m.Author.Username, strings.ToLower(m.Content))
+		subscriber.Publish(m.ChannelID, m.Author.Username, strings.ToLower(m.Content))
 	}
 }
 
