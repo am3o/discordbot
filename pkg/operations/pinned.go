@@ -10,13 +10,13 @@ import (
 )
 
 type PinnedMessagesOperator struct {
-	m      sync.Mutex
+	sync.Mutex
 	client *client.Discord
 	cached map[string][]string
 }
 
-func NewPinnedMessagesOperator(client *client.Discord) PinnedMessagesOperator {
-	return PinnedMessagesOperator{
+func NewPinnedMessagesOperator(client *client.Discord) *PinnedMessagesOperator {
+	return &PinnedMessagesOperator{
 		client: client,
 		cached: make(map[string][]string),
 	}
@@ -31,16 +31,16 @@ func (operator *PinnedMessagesOperator) Run(duration time.Duration) {
 				break
 			}
 
-			operator.m.Lock()
+			operator.Lock()
 			operator.cached[channelID] = pinnedMessages
-			operator.m.Unlock()
+			operator.Unlock()
 		}
 	}
 }
 
 func (operator *PinnedMessagesOperator) Exec(channelID string) (string, error) {
-	operator.m.Lock()
-	defer operator.m.Unlock()
+	operator.Lock()
+	defer operator.Unlock()
 
 	_, exists := operator.cached[channelID]
 	if !exists {

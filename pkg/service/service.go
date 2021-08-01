@@ -27,7 +27,7 @@ type Service struct {
 	collector      BotCollector
 	dictionary     operations.QuotesOperator
 	jokes          operations.JokesOperator
-	pinnedMessages operations.PinnedMessagesOperator
+	pinnedMessages *operations.PinnedMessagesOperator
 	discord        *client.Discord
 	addr           string
 }
