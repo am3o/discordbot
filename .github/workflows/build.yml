@@ -84,10 +84,15 @@ jobs:
            --platform ${{ matrix.archtype }} \
            --output "type=image,push=false" \
            --tag am3ocorp/discord-bot:latest \
-           --tag am3ocorp/discord-bot:${GITHUB_REF#refs/tags/} \
+           --tag am3ocorp/discord-bot:${{ steps.meta.outputs.tags }} \
            --file ./Dockerfile ./
 
+  publish:
+    runs-on: ubuntu-latest
+    environment: publish
+    needs: [ docker ]
+    steps:
       - name: Inspect image
         run: |
           docker buildx imagetools inspect am3ocorp/discord-bot:latest
-          docker buildx imagetools inspect am3ocorp/discord-bot:${GITHUB_REF#refs/tags/}
+          docker buildx imagetools inspect am3ocorp/discord-bot:${{ steps.meta.outputs.tags }}
