@@ -5,7 +5,7 @@ WORKDIR /app
 RUN go mod vendor
 RUN CGO_ENABLED=0 go build -mod=vendor -a -ldflags '-w' -o /app/main
 
-FROM alpine
+FROM scratch
 
 COPY --from=build /app/main /usr/local/bin/app
 CMD /usr/local/bin/app

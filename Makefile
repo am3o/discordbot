@@ -11,8 +11,11 @@ test:
 	go test -cover  -race  --short $$(go list ./... | grep -v /vendor/ | grep -v /integration | tr "\n" " ")
 
 vendor:
-	@echo ">> running vendorring ..."
+	@echo ">> running vendoring ..."
 	go mod vendor
+
+vet: ## Run go vet against code
+	go vet ./pkg/... .
 
 lint:
 	@echo ">> Running linter ..."

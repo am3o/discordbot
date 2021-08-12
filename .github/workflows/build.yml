@@ -2,27 +2,32 @@ name: Build
 
 on:
   push:
-    branches: [ main ]
   pull_request:
     branches: [ main ]
 
 jobs:
   test:
-    name: test
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        step: [ test, vet, fmt ]
     steps:
-      - name: Set up Go 1.x
-        uses: actions/setup-go@v2
-        with:
-          go-version: ^1.13
-        id: go
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
-      - name: Get dependencies
+      - name: Cleanup workspace
         run: |
-          go get -v -t -d ./...
-      - name: Test
-        run: go test -race -v $(go list ./... | grep -v /vendor/)
+          echo "Cleaning up previous run from ${{ github.workspace }}"
+          set -e # fail on error
+          shopt -s dotglob # include hidden files
+          sudo rm -rf *
+
+      - name: Checkout repository code
+        uses: actions/checkout@v2
+
+      - name: ${{ matrix.step }}
+        run: docker run --rm --mount src=`pwd`,target=/go/service,type=bind golang:buster /bin/bash -c "cd /go/service && make ${{ matrix.step }}"
+
+      - name: Remove docker image
+        run: docker rmi golang:buster
 
   lint:
     name: lint
@@ -33,7 +38,6 @@ jobs:
         uses: golangci/golangci-lint-action@v2
         with:
           version: v1.29
-
 
   build:
     name: build
@@ -57,6 +61,10 @@ jobs:
 
   docker:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        archtype: [ linux/arm/v6, linux/arm/v7 ]
     needs: [ build ]
     steps:
       - name: Checkout
@@ -68,19 +76,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
 
-      - name: Available platforms
-        run: echo ${{ steps.buildx.outputs.platforms }}
-
-      - name: Run Buildx
+      - name: ${{ matrix.archtype }}
         run: |
           docker buildx build \
            --cache-from "type=local,src=/tmp/.buildx-cache" \
            --cache-to "type=local,dest=/tmp/.buildx-cache" \
-           --platform linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64 \
+           --platform ${{ matrix.archtype }} \
            --output "type=image,push=false" \
            --tag am3ocorp/discord-bot:latest \
+           --tag am3ocorp/discord-bot:${GITHUB_REF#refs/tags/} \
            --file ./Dockerfile ./
 
       - name: Inspect image
         run: |
           docker buildx imagetools inspect am3ocorp/discord-bot:latest
+          docker buildx imagetools inspect am3ocorp/discord-bot:${GITHUB_REF#refs/tags/}
