@@ -84,7 +84,6 @@ jobs:
            --platform ${{ matrix.archtype }} \
            --output "type=image,push=false" \
            --tag am3ocorp/discord-bot:latest \
-           --tag am3ocorp/discord-bot:${{ steps.meta.outputs.tags }} \
            --file ./Dockerfile ./
 
   publish:
@@ -95,4 +94,11 @@ jobs:
       - name: Inspect image
         run: |
           docker buildx imagetools inspect am3ocorp/discord-bot:latest
-          docker buildx imagetools inspect am3ocorp/discord-bot:${{ steps.meta.outputs.tags }}
+
+      - name: Publish to Registry
+        uses: elgohr/Publish-Docker-Github-Action@master
+        with:
+          name: am3ocorp/discord-bot
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
