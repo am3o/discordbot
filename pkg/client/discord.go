@@ -29,6 +29,7 @@ func NewDiscord(token string) (*Discord, error) {
 	}
 
 	client.session.AddHandler(client.HandleMessageCreate)
+	client.session.AddHandler(client.HandleMessageUpdate)
 
 	return &client, nil
 }
@@ -69,17 +70,23 @@ func (client *Discord) SendMessage(channelID, authorID, content string) error {
 	return err
 }
 
+func (client *Discord) HandleMessageUpdate(_ *discord.Session, m *discord.MessageUpdate) {
+	client.handleMessage(m.Author.ID, m.ChannelID, m.Author.Username, strings.ToLower(m.Content))
+}
+
 func (client *Discord) HandleMessageCreate(_ *discord.Session, m *discord.MessageCreate) {
-	if m.Author.ID == client.session.State.User.ID {
+	client.handleMessage(m.Author.ID, m.ChannelID, m.Author.Username, strings.ToLower(m.Content))
+}
+
+func (client *Discord) handleMessage(userID, channelID, username, content string) {
+	if userID == client.session.State.User.ID {
 		return
 	}
 
 	for _, subscriber := range client.subscribers {
-		subscriber.
-			Publish(m.ChannelID, m.Author.Username, strings.ToLower(m.Content))
+		subscriber.Publish(channelID, username, content)
 	}
 }
-
 func (client *Discord) Author(id string) (string, error) {
 	user, err := client.session.User(id)
 	if err != nil {
