@@ -29,6 +29,7 @@ func main() {
 	)
 	if err != nil {
 		logger.WithError(err).Error("Could not initialize the bot")
+		panic(err)
 	}
 	defer bot.Close()
 
